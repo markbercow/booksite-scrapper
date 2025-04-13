@@ -19,14 +19,16 @@ def scrape_books(num_pages=5):
         pd.DataFrame: DataFrame containing titles, prices, availability, and rating data.
     """
     base_url = "http://books.toscrape.com/catalogue/page-{}.html"
-    all_titles = []
-    all_prices = []
-    all_availability = []
-    all_ratings = []
+    books_data = []
     
     for page in range(1, num_pages + 1):
         url = base_url.format(page)
-        response = requests.get(url)
+        try:
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
+        except requests.exceptions.RequestException as e:
+            print(f"Error fetching page {page}: {e}")
+            continue
         
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
@@ -49,22 +51,18 @@ def scrape_books(num_pages=5):
                 rating_classes = rating_tag.get('class', [])
                 rating = rating_classes[1] if len(rating_classes) > 1 else None
                 
-                all_titles.append(title)
-                all_prices.append(price_value)
-                all_availability.append(availability)
-                all_ratings.append(rating)
+                books_data.append({
+                    'title': title,
+                    'price': price_value,
+                    'availability': availability,
+                    'rating': rating
+                })
         else:
             print(f"Failed to retrieve page {page}")
-        time.sleep(1)
+        time.sleep(.5)
     
-    data = {
-        'title': all_titles,
-        'price': all_prices,
-        'availability': all_availability,
-        'rating': all_ratings
-    }
-    
-    df = pd.DataFrame(data)
+    df = pd.DataFrame(books_data)
+
     return df
 
 
@@ -124,21 +122,30 @@ def visualize_data(df):
     plt.close()
 
 
-# Step 1: Scrape the data
-df = scrape_books(num_pages=5)
+def main():
+    # Step 1: Scrape the data
+    df = scrape_books(num_pages=5)
 
-# Step 2: Clean and transform the data
-df = clean_data(df)
+    # Step 2: Clean and transform the data
+    df = clean_data(df)
 
-# Step 3: Explore the cleaned data
-print("DataFrame Head:")
-print(df.head())
+    # Step 3: Explore the cleaned data
+    print("DataFrame Head:")
+    print(df.head())
 
-print("\nSummary Statistics on Price:")
-print(df['price'].describe())
+    print("\nSummary Statistics on Price:")
+    print(df['price'].describe())
 
-print("\nValue Counts for Ratings:")
-print(df['rating'].value_counts())
+    print("\nValue Counts for Ratings:")
+    print(df['rating'].value_counts())
 
-# Step 4: Visualize the data
-visualize_data(df)
+    # Step 4: Visualize the data
+    visualize_data(df)
+
+    # Step 5: Save the cleaned data to a CSV file
+    df.to_csv('books_data.csv', index=False)
+    print("Data saved to books_data.csv")
+    
+
+if __name__ == "__main__":
+    main()
