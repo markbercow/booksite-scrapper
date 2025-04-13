@@ -1,69 +1,67 @@
-import requests
+import aiohttp
+import asyncio
 from bs4 import BeautifulSoup
 import pandas as pd
-import time
 import matplotlib
 matplotlib.use('Agg')  # Set before importing pyplot
 import matplotlib.pyplot as plt
 import seaborn as sns
 
 
-def scrape_books(num_pages=5):
-    """
-    Scrapes books data from 'http://books.toscrape.com' for the specified number of pages.
+async def fetch_page(session, url, page):
+    try:
+        async with session.get(url) as response:
+            if response.status == 200:
+                text = await response.text()
+                return (page, text)
+            else:
+                print(f"Failed to fetch page {page}: {response.status}")
+                return (page, None)
+    except Exception as e:
+        print(f"Error fetching page {page}: {e}")
+        return (page, None)
     
-    Parameters:
-        num_pages (int): Number of pages to scrape.
-        
-    Returns:
-        pd.DataFrame: DataFrame containing titles, prices, availability, and rating data.
-    """
+def parse_books_from_html(html):
+    soup = BeautifulSoup(html, 'html.parser')
+    books = soup.find_all('article', class_='product_pod')
+    books_data = []
+    for book in books:
+        title = book.h3.a['title']
+        price_text = book.find('p', class_='price_color').text
+        price = float(price_text.replace('£', '').strip())
+        availability = book.find('p', class_='instock availability').text.strip()
+        rating = book.find('p', class_='star-rating').get('class', [None, None])[1]
+        books_data.append({
+            'title': title,
+            'price': price,
+            'availability': availability,
+            'rating': rating
+        })
+
+    return books_data
+
+
+async def scrape_books_async(num_pages=5):
     base_url = "http://books.toscrape.com/catalogue/page-{}.html"
     books_data = []
     
-    for page in range(1, num_pages + 1):
-        url = base_url.format(page)
-        try:
-            response = requests.get(url, timeout=10)
-            response.raise_for_status()
-        except requests.exceptions.RequestException as e:
-            print(f"Error fetching page {page}: {e}")
-            continue
+    async with aiohttp.ClientSession() as session:
+        tasks = []
+        for page in range(1, num_pages + 1):
+            url = base_url.format(page)
+            tasks.append(fetch_page(session, url, page))
         
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.text, 'html.parser')
-            books = soup.find_all('article', class_='product_pod')
-            
-            for book in books:
-                # Title
-                title = book.h3.a['title']
-                
-                # Price
-                price = book.find('p', class_='price_color').text
-                cleaned_price = price.replace('£', '').encode('ascii', 'ignore').decode('ascii').strip()
-                price_value = float(cleaned_price)
-                
-                # Availability
-                availability = book.find('p', class_='instock availability').text.strip()
-                
-                # Rating
-                rating_tag = book.find('p', class_='star-rating')
-                rating_classes = rating_tag.get('class', [])
-                rating = rating_classes[1] if len(rating_classes) > 1 else None
-                
-                books_data.append({
-                    'title': title,
-                    'price': price_value,
-                    'availability': availability,
-                    'rating': rating
-                })
-        else:
-            print(f"Failed to retrieve page {page}")
-        time.sleep(.5)
+        pages_content = await asyncio.gather(*tasks)
+        
+        for page, html in pages_content:
+            if html:
+                books_data.extend(parse_books_from_html(html))
     
-    df = pd.DataFrame(books_data)
+    return pd.DataFrame(books_data)
 
-    return df
+
+def scrape_books(num_pages=5):
+    return asyncio.run(scrape_books_async(num_pages))
 
 
 def clean_data(df):
@@ -145,7 +143,7 @@ def main():
     # Step 5: Save the cleaned data to a CSV file
     df.to_csv('books_data.csv', index=False)
     print("Data saved to books_data.csv")
-    
+
 
 if __name__ == "__main__":
     main()
