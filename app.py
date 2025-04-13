@@ -1,11 +1,24 @@
 import aiohttp
 import asyncio
+from functools import wraps
+import time
 from bs4 import BeautifulSoup
 import pandas as pd
 import matplotlib
 matplotlib.use('Agg')  # Set before importing pyplot
 import matplotlib.pyplot as plt
 import seaborn as sns
+
+
+def time_execution(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        start = time.time()
+        result = func(*args, **kwargs)
+        elapsed = time.time() - start
+        print(f"{func.__name__} took {elapsed:.4f} seconds to execute.")
+        return result
+    return wrapper
 
 
 async def fetch_page(session, url, page):
@@ -21,6 +34,7 @@ async def fetch_page(session, url, page):
         print(f"Error fetching page {page}: {e}")
         return (page, None)
     
+
 def parse_books_from_html(html):
     soup = BeautifulSoup(html, 'html.parser')
     books = soup.find_all('article', class_='product_pod')
@@ -60,6 +74,7 @@ async def scrape_books_async(num_pages=5):
     return pd.DataFrame(books_data)
 
 
+@time_execution
 def scrape_books(num_pages=5):
     return asyncio.run(scrape_books_async(num_pages))
 
