@@ -76,6 +76,7 @@ async def scrape_books_async(num_pages=5):
 
 @time_execution
 def scrape_books(num_pages=5):
+    print(num_pages)
     return asyncio.run(scrape_books_async(num_pages))
 
 
@@ -137,23 +138,23 @@ def visualize_data(df):
 
 def main():
     # Step 1: Scrape the data
-    df = scrape_books(num_pages=5)
+    df = scrape_books(num_pages=10)
 
     # Step 2: Clean and transform the data
-    df = clean_data(df)
+    # df = clean_data(df)
 
     # Step 3: Explore the cleaned data
     print("DataFrame Head:")
     print(df.head())
 
-    print("\nSummary Statistics on Price:")
+    """ print("\nSummary Statistics on Price:")
     print(df['price'].describe())
 
     print("\nValue Counts for Ratings:")
-    print(df['rating'].value_counts())
+    print(df['rating'].value_counts()) """
 
     # Step 4: Visualize the data
-    visualize_data(df)
+    # visualize_data(df)
 
     # Step 5: Save the cleaned data to a CSV file
     df.to_csv('books_data.csv', index=False)
